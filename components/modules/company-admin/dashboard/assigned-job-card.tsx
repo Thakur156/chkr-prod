@@ -1,0 +1,228 @@
+import React from "react";
+import Image from "next/image";
+import Location from "@/assets/icons/location-icon";
+import EditIcon from "@/assets/icons/edit-icon";
+import ShowJobDetails from "../../../shared/show-job-details";
+import DeleteModal from "../../../shared/delete-modal";
+import CreateJob from "../jobs/create-job";
+import { Dialog, DialogTrigger } from "@/components/ui/dialog";
+import { format } from "date-fns";
+import { Wallet } from "lucide-react";
+import { ChargeAndTransfer } from "@/actions/payment/payment-action";
+import { toast } from "react-toastify";
+import Loader from "@/components/shared/loader";
+
+interface AssignedJobCardProps {
+  id: number;
+  customer_name: string;
+  location: {
+    name: string;
+    lat: number;
+    lng: number;
+  };
+  status: string;
+  phone_number: string;
+  date_time: string;
+  service: string;
+  price: number;
+  assignedUsers: Array<{
+    first_name: string;
+    last_name: string;
+    picture: string;
+    request_status: string;
+  }>;
+  currentTab: string;
+  payment_status?: string;
+}
+
+const AssignedJobCard: React.FC<AssignedJobCardProps> = ({
+  id,
+  customer_name,
+  location,
+  status,
+  phone_number,
+  date_time,
+  service,
+  price,
+  assignedUsers,
+  currentTab,
+  payment_status,
+}) => {
+  const [isOpen, setIsOpen] = React.useState(false);
+  const [isLoading, setIsLoading] = React.useState(false);
+  const toggleModal = () => {
+    setIsOpen(!isOpen);
+  };
+
+  const handleClick = async () => {
+    try {
+      setIsLoading(true);
+      const response: any = await ChargeAndTransfer(id);
+      if (response?.statusCode === 200) {
+        return toast.success(response?.message);
+      }
+      return toast.error(response?.message);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const displayEmployeeName = () => {
+    if (currentTab === "cancelled") {
+      const rejectedUsers = assignedUsers.filter(
+        (user) => user.request_status === "rejected"
+      );
+      if (rejectedUsers.length === 1) {
+        return `${rejectedUsers[0].first_name} ${rejectedUsers[0].last_name}`;
+      } else if (rejectedUsers.length > 1) {
+        return `${rejectedUsers[0].first_name} ${
+          rejectedUsers[0].last_name
+        } & ${rejectedUsers.length - 1} more`;
+      } else {
+        return "Unassigned";
+      }
+    }
+
+    if (assignedUsers.length > 1) {
+      return `${assignedUsers[0].first_name} ${assignedUsers[0].last_name} & ${
+        assignedUsers.length - 1
+      } more`;
+    } else if (assignedUsers.length === 1) {
+      return `${assignedUsers[0].first_name} ${assignedUsers[0].last_name}`;
+    } else {
+      return "Unassigned";
+    }
+  };
+
+  const displayUserImages = () => {
+    let usersToDisplay = [];
+
+    if (currentTab === "cancelled") {
+      usersToDisplay = assignedUsers.filter(
+        (user) => user.request_status === "rejected"
+      );
+    } else {
+      usersToDisplay = assignedUsers;
+    }
+
+    const userCount = usersToDisplay.length;
+
+    return (
+      <>
+        {userCount > 0 && (
+          <Image
+            src={usersToDisplay[0].picture || "/images/user.jpeg"}
+            alt="user-image"
+            height={30}
+            width={30}
+            className="rounded-full w-10 h-10 absolute left-2"
+          />
+        )}
+        {userCount > 1 && (
+          <div className="rounded-full w-10 h-10 absolute left-6 bg-gray-200 flex items-center justify-center">
+            <span className="text-sm">+{userCount - 1}</span>
+          </div>
+        )}
+      </>
+    );
+  };
+
+  return (
+    <div className="mb-6 bg-white rounded-3xl p-4 shadow-xl">
+      <div className="flex flex-wrap justify-between">
+        <div className="flex flex-col">
+          <h1 className="font-bold text-xl mb-3">{customer_name}</h1>
+          <div className="flex items-center">
+            <Location className="md::h-6 md:w-6 w-10 h-10" />
+            <span className="font-semibold text-lg mobile:text-base text-gray-700 ml-2">
+              {location.name}
+            </span>
+          </div>
+        </div>
+
+        <div className="flex gap-2 h-3/4 mt-4 lg:mt-0 flex-wrap">
+          {status === "completed" &&
+            (payment_status === "paid" ? (
+              <div className="flex items-center justify-center bg-primary rounded-xl px-3 text-white w-32">
+                Paid
+              </div>
+            ) : (
+              <div
+                className="flex items-center justify-center bg-primary hover:bg-red-600 rounded-xl px-3 text-white cursor-pointer w-32"
+                onClick={handleClick}
+                aria-disabled={isLoading}
+              >
+                {isLoading ? (
+                  <Loader size={6} />
+                ) : (
+                  <>
+                    <Wallet size={16} className="mr-2" />
+                    Pay Now
+                  </>
+                )}
+              </div>
+            ))}
+          <div className="flex items-center bg-gray-100 rounded-xl px-3">
+            <span>{status?.charAt(0).toUpperCase() + status?.slice(1)}</span>
+          </div>
+          <Dialog>
+            <DialogTrigger asChild>
+              <div className="cursor-pointer" onClick={toggleModal}>
+                <EditIcon />
+              </div>
+            </DialogTrigger>
+          </Dialog>
+          {isOpen && (
+            <CreateJob open={isOpen} onClose={toggleModal} jobId={id} />
+          )}
+          <DeleteModal userId={id} jobId={id} />
+          <ShowJobDetails jobId={id} />
+        </div>
+      </div>
+      <div className="flex mt-6 justify-between lg:flex-row flex-col lg:gap-0 gap-5">
+        <div className="flex flex-wrap gap-4 ">
+          <div className="flex flex-col text-sm lg:text-lg whitespace-nowrap">
+            <span className="font-bold md:text-lg">Phone number:</span>
+            <span className="bg-gray-100 rounded-2xl py-3 px-6 mt-2 md:text-base">
+              {phone_number}
+            </span>
+          </div>
+          <div className="flex flex-col text-sm lg:text-lg whitespace-nowrap">
+            <span className="font-bold md:text-lg">Date & Time:</span>
+            <span className="bg-gray-100 rounded-2xl py-3 px-6 mt-2 md:text-base">
+              {format(date_time, "dd MMMM yyyy, h:mm a")}
+            </span>
+          </div>
+          <div className="flex flex-col text-sm whitespace-nowrap">
+            <span className="font-bold md:text-lg">Service:</span>
+            <span className="bg-gray-100 rounded-2xl py-3 px-6 mt-2 md:text-base">
+              {service}
+            </span>
+          </div>
+          <div className="flex flex-col text-sm whitespace-nowrap">
+            <span className="font-bold md:text-lg">Total Price:</span>
+            <span className="bg-gray-100 rounded-2xl py-3 px-6 mt-2 md:text-base ">
+              $ {price} USD
+            </span>
+          </div>
+        </div>
+        <div className="flex flex-col whitespace-nowrap mr-4 mt-1 mobile:mb-4">
+          <span className="font-bold text-lg">
+            {currentTab === "cancelled" ? "Rejected By:" : "Assigned To:"}
+          </span>
+          <div className="flex gap-2 mt-2 relative">
+            {displayUserImages()}
+            <span className="mt-2 ml-20 font-semibold text-sm text-[#232324]">
+              {displayEmployeeName()}
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default AssignedJobCard;
+

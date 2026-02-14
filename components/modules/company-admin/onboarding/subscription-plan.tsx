@@ -1,0 +1,101 @@
+import React, { useEffect, useState } from "react";
+import PlanCard from "./plan-card";
+import { useFormContext } from "react-hook-form";
+import { ErrorMessage } from "@hookform/error-message";
+import useOnboardingStore from "@/store/onboarding-store";
+import { PlanInterface } from "@/lib/interfaces";
+import { PlansAction } from "@/actions/payment/payment-action";
+import Loader from "@/components/shared/loader";
+
+const SubscriptionPlan = ({
+  handlePreviousStep,
+}: {
+  handlePreviousStep: () => void;
+}) => {
+  const {
+    register,
+    getValues,
+    setValue,
+    formState: { errors },
+  } = useFormContext();
+  const { onboardingData } = useOnboardingStore();
+  const [plans, setPlans] = useState<PlanInterface>();
+  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    const fetchPlans = async () => {
+      try {
+        setIsLoading(true);
+        const response = await PlansAction();
+        if (response.length > 0) {
+          setValue("plan", response[0].id.toString());
+        }
+        setPlans(response);
+      } catch (error) {
+        console.error("Error fetching plans:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchPlans();
+  }, []);
+
+  return (
+    <div className="flex flex-col w-full justify-center items-center">
+      {isLoading ? (
+        <div className="flex items-center justify-center h-96">
+          <Loader />
+        </div>
+      ) : (
+        <>
+          <div className="bg-white w-full shadow-md rounded-3xl px-8 pt-2 pb-8 my-10 gap-6">
+            {plans?.plans?.map((plan: any) => (
+              <div
+                key={plan.id}
+                className="flex items-baseline hover:border-2 p-2 hover:rounded-3xl hover:border-primary focus:border-2 focus:border-primary"
+              >
+                <input
+                  type="radio"
+                  className="cursor-pointer"
+                  placeholder={plan.plan_type}
+                  id={`plan-${plan.id}`}
+                  value={plan.id}
+                  defaultChecked={onboardingData.plan === plan.productName}
+                  {...register("plan")}
+                />
+                <PlanCard
+                  title={plan.productName}
+                  price={plan.price}
+                  description={plan.productDescription}
+                />
+              </div>
+            ))}
+            <p className="text-sm text-red-500">
+              <ErrorMessage errors={errors} name="plan" />
+            </p>
+          </div>
+          <div className="flex w-full items-center md:justify-end justify-center mt-2 gap-6 px-4">
+            <button
+              className="w-full lg:w-[10rem] bg-gray-300 font-medium py-3 px-10 rounded-3xl"
+              type="button"
+              onClick={handlePreviousStep}
+            >
+              Previous
+            </button>
+            <button
+              className="w-full lg:w-[10rem] bg-primary text-white font-medium py-3 px-10 rounded-3xl"
+              type="submit"
+              id="onboarding-form"
+              disabled={getValues("loading")}
+            >
+              {getValues("loading") ? <Loader size={6} /> : "Next"}
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+};
+
+export default SubscriptionPlan;
+
